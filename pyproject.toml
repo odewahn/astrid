@@ -10,3 +10,6 @@ dependencies = [
     "art",
     "prompt_toolkit",
 ]
+
+[project.scripts]
+astrid = "astrid.__main__:main"
