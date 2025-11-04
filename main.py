@@ -25,7 +25,8 @@ async def main():
             console.print("[bold red]Exiting REPL. Goodbye![/bold red]")
             break
         ctx.append(user_input, "user")
-        response = llm_processor.process_mock(user_input, settings.DEFAULT_MODEL)
+        with console.status("Thinking..."):
+            response = llm_processor.process_mock(user_input, settings.DEFAULT_MODEL)
         ctx.append(response, "assistant")
 
         print(response, "\n", json.dumps(ctx.get_context(), indent=2))
