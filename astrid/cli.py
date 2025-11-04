@@ -3,16 +3,20 @@ import asyncio
 from rich.console import Console
 from astrid.config import settings
 from astrid.context import Context
-from astrid.llm_processor import LLMProcessor
 from astrid.repl import REPL
 
 
 async def run_repl(console: Console):
     ctx = Context()
     repl = REPL(ctx, console)
-    llm = LLMProcessor(console)
-
     repl.print_welcome()
+
+    # Load the slower loading dependencies with a status message
+    with console.status("Starting the LLM..."):
+        from astrid.llm_processor import LLMProcessor
+
+        llm = LLMProcessor()
+
     while True:
         user_input = await repl.get_input()
         if repl.should_exit():

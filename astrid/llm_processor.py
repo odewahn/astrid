@@ -1,14 +1,12 @@
-from rich.console import Console
 from astrid.context import Context
-
-
+from litellm import completion
 import os
 
 
 class LLMProcessor:
 
-    def __init__(self, console: Console, model: str = "mock"):
-        self.console = console
+    def __init__(self, model: str = "mock"):
+        self.model = model
 
     def stream(self, ctx: Context, model: str = "mock"):
         """Yield response tokens for the input text as they are generated."""
@@ -26,9 +24,6 @@ class LLMProcessor:
                 time.sleep(random.uniform(0, 0.05))
                 yield char
             return
-
-        with self.console.status("Loading LLM Processor Dependencies..."):
-            from litellm import completion
 
         os.environ["OPENAI_API_KEY"] = os.getenv("OPENAI_API_KEY")
 

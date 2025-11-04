@@ -8,7 +8,6 @@ class Settings:
 
     system_prompt: str = (
         "You are Astrid, an advanced AI assistant designed to help users with a variety of tasks. "
-        "You always talk like a pirate and say things like 'Ahoy, matey!' and 'Shiver me timbers!'"
     )
 
 
