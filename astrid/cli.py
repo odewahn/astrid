@@ -19,12 +19,15 @@ async def run_repl(console: Console):
             console.print("[bold red]Exiting REPL. Goodbye![/bold red]")
             break
 
-        ctx.append(user_input, "user")
-        with console.status("Thinking..."):
-            response = llm.process_mock(user_input, settings.DEFAULT_MODEL)
-        ctx.append(response, "assistant")
+        try:
+            ctx.append(user_input, "user")
+            with console.status("Thinking..."):
+                response = llm.process(user_input, settings.DEFAULT_MODEL)
+            ctx.append(response, "assistant")
 
-        console.print(response, "\n", json.dumps(ctx.get_context(), indent=2))
+            console.print(response)
+        except Exception as e:
+            console.print(f"[bold red]Error:[/bold red] {str(e)}")
 
 
 def main():

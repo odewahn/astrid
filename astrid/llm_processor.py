@@ -7,27 +7,30 @@ import os
 
 class LLMProcessor:
 
-    def __init__(self, ctx: Context, console: Console):
+    def __init__(self, ctx: Context, console: Console, model: str = "mock"):
         self.ctx = ctx
         self.console = console
 
-    def process_mock(self, input_text: str, model: str) -> str:
-        # sleep for a random time to simulate processing
-        import time
-        import random
+    def process(self, input_text: str, model: str = "mock") -> str:
+        # Handle the mock model separately
+        if model == "mock":
+            # sleep for a random time to simulate processing
+            import time
+            import random
 
-        time.sleep(random.uniform(0, 1))
-        return f"Response to {input_text}"
+            time.sleep(random.uniform(0, 1))
+            return f"Response to {input_text}"
 
-    def process_real(self, input_text: str, model: str) -> str:
+        # Real processing goes here
         with self.console.status("Loading LLM Processor Dependencies..."):
             from litellm import completion
+
         ## set ENV variables
         os.environ["OPENAI_API_KEY"] = os.getenv("OPENAI_API_KEY")
 
         response = completion(
-            model="openai/gpt-5-nano",
-            messages=[{"content": "Hello, how are you?", "role": "user"}],
+            model=model,
+            messages=[{"content": input_text, "role": "user"}],
         )
 
         return response.choices[0].message["content"]
