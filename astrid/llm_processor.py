@@ -7,30 +7,42 @@ import os
 
 class LLMProcessor:
 
-    def __init__(self, ctx: Context, console: Console, model: str = "mock"):
-        self.ctx = ctx
+    def __init__(self, console: Console, model: str = "mock"):
         self.console = console
 
-    def process(self, input_text: str, model: str = "mock") -> str:
-        # Handle the mock model separately
+    def stream(self, ctx: Context, model: str = "mock"):
+        """Yield response tokens for the input text as they are generated."""
         if model == "mock":
-            # sleep for a random time to simulate processing
-            import time
-            import random
+            import time, random
 
-            time.sleep(random.uniform(0, 1))
-            return f"Response to {input_text}"
+            # get the last piece of user input
+            input_text = ""
+            for message in reversed(ctx.get_context()):
+                if message["role"] == "user":
+                    input_text = message["content"]
+                    break
+            response = f"Here is my response to {input_text}"
+            for char in response:
+                time.sleep(random.uniform(0, 0.05))
+                yield char
+            return
 
-        # Real processing goes here
         with self.console.status("Loading LLM Processor Dependencies..."):
             from litellm import completion
 
-        ## set ENV variables
         os.environ["OPENAI_API_KEY"] = os.getenv("OPENAI_API_KEY")
 
-        response = completion(
+        response_stream = completion(
             model=model,
-            messages=[{"content": input_text, "role": "user"}],
+            messages=ctx.get_context(),
+            max_tokens=1024,
+            stream=True,
         )
-
-        return response.choices[0].message["content"]
+        for partial in response_stream:
+            choice = partial.choices[0]
+            if hasattr(choice, "delta"):
+                content = choice.delta.get("content", "")
+            else:
+                content = choice.message.get("content", "")
+            if content:
+                yield content

@@ -10,7 +10,7 @@ from astrid.repl import REPL
 async def run_repl(console: Console):
     ctx = Context()
     repl = REPL(ctx, console)
-    llm = LLMProcessor(ctx, console)
+    llm = LLMProcessor(console)
 
     repl.print_welcome()
     while True:
@@ -21,11 +21,13 @@ async def run_repl(console: Console):
 
         try:
             ctx.append(user_input, "user")
-            with console.status("Thinking..."):
-                response = llm.process(user_input, settings.DEFAULT_MODEL)
+            response_chunks = []
+            for chunk in llm.stream(ctx, settings.DEFAULT_MODEL):
+                console.print(chunk, end="", soft_wrap=True)
+                response_chunks.append(chunk)
+            response = "".join(response_chunks)
             ctx.append(response, "assistant")
-
-            console.print(response)
+            console.print()
         except Exception as e:
             console.print(f"[bold red]Error:[/bold red] {str(e)}")
 
