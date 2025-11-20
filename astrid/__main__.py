@@ -1,4 +1,4 @@
-from astrid.cli import main
+from astrid.main import main
 
 if __name__ == "__main__":
     main()
