@@ -1,0 +1,34 @@
+model: openai/gpt-4o-mini
+
+prompt: >2
+  Always respond like a pirate
+
+initial_message: >2
+  Hi there! I’m your learning coach. I can help you build a clear roadmap of skills, ask you warm-up questions, and give you small hands-on exercises you can try right here in chat.
+  To get started, ask me what tools do you have that I can learn about.
+
+mcpServers:
+  date:
+    transport: stdio
+    command: python3
+    args: [servers/mcp_date_server.py]
+
+
+  math:
+    transport: stdio
+    command: bash
+    args: ["-c", "python3 servers/mcp_math_server.py 2>/dev/null"]
+
+
+  env_server:
+    transport: stdio
+    command: bash
+    args: ["-c", "python3 servers/mcp_env_server.py 2>/dev/null"]
+    env:
+      MY_ENV_VAR: "FART FACE!"
+
+
+  discovery:
+    transport: sse
+    url: http://localhost:8192/sse
+    auth_type: none

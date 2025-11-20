@@ -1,39 +1,40 @@
-import json
 import asyncio
-from rich.console import Console
+
 from astrid.config import settings
-from astrid.context import Context
-from astrid.repl import REPL
+
+from rich import print
+from rich.console import Console
+from art import text2art
+
+from prompt_toolkit import PromptSession
+from prompt_toolkit.patch_stdout import patch_stdout
+
+
+# Read the user input.  Set the quit_repl flag to True on EOF or KeyboardInterrupt.
+async def get_input(session: PromptSession) -> str:
+    with patch_stdout(session):
+        try:
+            text = await session.prompt_async()
+            return text
+        except KeyboardInterrupt:
+            return "/quit"
 
 
 async def run_repl(console: Console):
-    ctx = Context()
-    repl = REPL(ctx, console)
-    repl.print_welcome()
 
-    # Load the slower loading dependencies with a status message
-    with console.status("Starting the LLM..."):
-        from astrid.llm_processor import LLMProcessor
+    # Print the startup screen
+    Art = text2art(settings.ASSISTANT_NAME)
+    console.print(f"[bold green] {settings.ASSISTANT_NAME} client v{settings.version}.")
+    console.print(f"[green]\n{Art}\n")
 
-        llm = LLMProcessor()
-
+    session = PromptSession("> ")
     while True:
-        user_input = await repl.get_input()
-        if repl.should_exit():
-            console.print("[bold red]Exiting REPL. Goodbye![/bold red]")
+        user_input = await get_input(session)
+
+        if user_input in ["/exit", "/quit", "/q"]:
             break
 
-        try:
-            ctx.append(user_input, "user")
-            response_chunks = []
-            for chunk in llm.stream(ctx, settings.DEFAULT_MODEL):
-                console.print(chunk, end="", soft_wrap=True)
-                response_chunks.append(chunk)
-            response = "".join(response_chunks)
-            ctx.append(response, "assistant")
-            console.print()
-        except Exception as e:
-            console.print(f"[bold red]Error:[/bold red] {str(e)}")
+        console.print(f"[bold blue]You entered:[/bold blue] {user_input}")
 
 
 def main():
