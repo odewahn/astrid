@@ -1,13 +1,13 @@
 class Settings:
     """Application configuration, loaded from environment or defaults."""
 
-    version: str = "0.1.0"
+    VERSION: str = "0.1.0"
     ASSISTANT_NAME: str = "Astrid"
-    DEFAULT_MODEL: str = "openai/gpt-4o-mini"
-    config_file: str = "config.yaml"
+    DEFAULT_CONFIG_FILE: str = "config.yaml"
 
-    system_prompt: str = (
-        "You are Astrid, an advanced AI assistant designed to help users with a variety of tasks. "
+    DEFAULT_MODEL: str = "openai/gpt-4o-mini"
+    DEFAULT_SYSTEM_PROMPT: str = (
+        "You are Astrid, an AI assistant that helps users with a variety of tasks."
     )
 
 
