@@ -1,9 +1,6 @@
 import asyncio
 import argparse
 
-
-from rich import print
-from rich.console import Console
 from art import text2art
 
 from prompt_toolkit import PromptSession
@@ -37,22 +34,18 @@ warnings.filterwarnings("ignore", category=PydanticDeprecatedSince211)
 # UI class for managing status and token printing
 # **********************************************************************
 class TurnUI:
-    def __init__(self, console: Console) -> None:
-        self.console = console
-        self.status = console.status("")
 
     def set_status(self, text: str) -> None:
-        self.status.start()
-        self.status.update(text)
+        print("Setting status:", text)
 
     def hide_status(self) -> None:
-        self.status.stop()
+        print("Hiding status")
 
     def print_streaming_token(self, text: str) -> None:
-        self.console.print(text, end="", soft_wrap=True)
+        print(text, end="", flush=True)
 
     def print(self, text: str) -> None:
-        self.console.print(text)
+        print(text)
 
 
 # **********************************************************************
@@ -190,48 +183,18 @@ def create_initial_turn(config, user_input: str) -> "Turn":
 # REPL Related Code
 # **********************************************************************
 
-"""
-async def get_input(session: PromptSession) -> str:
-    with patch_stdout(session):
-        try:
-            text = await session.prompt_async()
-            return text
-        except KeyboardInterrupt:
-            return "/quit"
-"""
-
-
-async def get_input(session: PromptSession) -> str:
-    with patch_stdout():
-        try:
-            text = await session.prompt_async()
-            return text
-        except KeyboardInterrupt:
-            return "/quit"
-
 
 async def run_repl(config: dict = None, client: Client = None, ui: TurnUI = None):
 
-    # Print the startup screen
-    Art = text2art(settings.ASSISTANT_NAME)
-    ui.print(f"[bold green] {settings.ASSISTANT_NAME} client v{settings.VERSION}.")
-    ui.print(f"[green]\n{Art}\n")
+    ui.print(f"{settings.ASSISTANT_NAME} client v{settings.VERSION}.")
 
-    # ui.set_status("Initializing...")
     session = PromptSession("> ")
 
     async with client:
         mcp_tools = await client.list_tools()
         openai_tools = convert_mcp_tools_to_openai_format(mcp_tools)
-        """
-        if ui:
-            ui.hide_status()
-            ui.print("Ready to comply. Type /exit to quit.\n")
-        """
 
         while True:
-
-            # user_input = await get_input(session)
 
             try:
                 user_input = await session.prompt_async()
@@ -257,14 +220,12 @@ async def run_repl(config: dict = None, client: Client = None, ui: TurnUI = None
 
 
 def main():
-    console = Console()
-    ui = TurnUI(console)
+    ui = TurnUI()
     parser = create_parser()
     args = parser.parse_args()
-    print("Args", args)
 
     if args.version:
-        print(f"{settings.ASSISTANT_NAME} version {settings.version}")
+        ui.print(f"{settings.ASSISTANT_NAME} version {settings.version}")
         return
 
     config = load_config(args.config)
