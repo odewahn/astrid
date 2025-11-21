@@ -134,20 +134,14 @@ async def complete_turn(
         # =====================================================================
         # 2. Check for tool calls
         # =====================================================================
-        # `assistant_msg` may be a dict-like or Pydantic model; handle both.
 
         has_tool_calls = getattr(assistant_msg, "tool_calls", None)
 
         # No tool calls -> we are done
-        if not has_tool_calls:
+        if client is None or not has_tool_calls:
             break
 
-        # Safety: if we can't actually run tools, just stop here
-        if client is None:
-            # Optional: you could add a system/assistant warning here instead
-            break
-
-        # Looped too many times? -> we are done
+        # Looped too many times -> we are done
         if new_turn.loop_count >= max_tool_loops:
             break
 
@@ -165,10 +159,11 @@ async def complete_turn(
         # Call the tools and add them to the growing conversation for inclusion in the next iteration
         for tc in tool_calls["tool_calls"]:
             name = tc["function"]["name"]
-            args = safe_json_loads(tc["function"]["arguments"])
+            arg_str = tc["function"]["arguments"]
+            args = safe_json_loads(arg_str)
 
             if ui:
-                ui.set_status(f"Running tool '{name}'...")
+                ui.set_status(f"Running '{name}' with {arg_str[:20]}...")
 
             result = await run_tool(client, name, args)
 
@@ -195,9 +190,19 @@ def create_initial_turn(config, user_input: str) -> "Turn":
 # REPL Related Code
 # **********************************************************************
 
-
+"""
 async def get_input(session: PromptSession) -> str:
     with patch_stdout(session):
+        try:
+            text = await session.prompt_async()
+            return text
+        except KeyboardInterrupt:
+            return "/quit"
+"""
+
+
+async def get_input(session: PromptSession) -> str:
+    with patch_stdout():
         try:
             text = await session.prompt_async()
             return text
@@ -212,13 +217,26 @@ async def run_repl(config: dict = None, client: Client = None, ui: TurnUI = None
     ui.print(f"[bold green] {settings.ASSISTANT_NAME} client v{settings.VERSION}.")
     ui.print(f"[green]\n{Art}\n")
 
+    # ui.set_status("Initializing...")
     session = PromptSession("> ")
 
     async with client:
         mcp_tools = await client.list_tools()
         openai_tools = convert_mcp_tools_to_openai_format(mcp_tools)
+        """
+        if ui:
+            ui.hide_status()
+            ui.print("Ready to comply. Type /exit to quit.\n")
+        """
+
         while True:
-            user_input = await get_input(session)
+
+            # user_input = await get_input(session)
+
+            try:
+                user_input = await session.prompt_async()
+            except KeyboardInterrupt:
+                user_input = "/quit"
 
             if user_input in ["/exit", "/quit", "/q"]:
                 break
