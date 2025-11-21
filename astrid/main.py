@@ -14,6 +14,7 @@ from astrid.utils import (
     run_tool,
 )
 from astrid.conversation import Turn
+from astrid.ptk_turn_ui import PTKTurnUI
 
 from typing import Optional, List
 from openai.types.chat import ChatCompletionToolParam
@@ -28,24 +29,6 @@ from pydantic import PydanticDeprecatedSince20, PydanticDeprecatedSince211
 
 warnings.filterwarnings("ignore", category=PydanticDeprecatedSince20)
 warnings.filterwarnings("ignore", category=PydanticDeprecatedSince211)
-
-
-# **********************************************************************
-# UI class for managing status and token printing
-# **********************************************************************
-class TurnUI:
-
-    def set_status(self, text: str) -> None:
-        print("Setting status:", text)
-
-    def hide_status(self) -> None:
-        print("Hiding status")
-
-    def print_streaming_token(self, text: str) -> None:
-        print(text, end="", flush=True)
-
-    def print(self, text: str) -> None:
-        print(text)
 
 
 # **********************************************************************
@@ -76,12 +59,39 @@ def create_parser() -> argparse.ArgumentParser:
 # **********************************************************************
 # Core turn completion logic
 # **********************************************************************
+class LLMEngine:
+    def __init__(self, config: dict, client: Client):
+        self.config = config
+        self.client = client
+        self.tools = None
+
+    async def initialize(self):
+        mcp_tools = await self.client.list_tools()
+        self.tools = convert_mcp_tools_to_openai_format(mcp_tools)
+
+    async def handle_user_message(self, user_input: str, ui) -> None:
+        # Mirror the REPL’s commands as needed; you can also handle /exit at TUI level.
+        if user_input == "/config":
+            ui.print(f"Current config: {self.config}")
+            return
+
+        initial_turn = create_initial_turn(self.config, user_input)
+        await complete_turn(
+            initial_turn=initial_turn,
+            config=self.config,
+            client=self.client,
+            tools=self.tools,
+            ui=ui,
+        )
+        ui.print("")  # blank line after each turn
+
+
 async def complete_turn(
     initial_turn: Turn,
     config: dict = None,
     client: Client = None,
     tools: Optional[List[ChatCompletionToolParam]] = None,
-    ui: Optional[TurnUI] = None,
+    ui: Optional[PTKTurnUI] = None,
     max_tool_loops: int = 4,
 ):
 
@@ -179,57 +189,37 @@ def create_initial_turn(config, user_input: str) -> "Turn":
     return turn
 
 
-# **********************************************************************
-# REPL Related Code
-# **********************************************************************
-
-
-async def run_repl(config: dict = None, client: Client = None, ui: TurnUI = None):
-
-    ui.print(f"{settings.ASSISTANT_NAME} client v{settings.VERSION}.")
-
-    session = PromptSession("> ")
-
-    async with client:
-        mcp_tools = await client.list_tools()
-        openai_tools = convert_mcp_tools_to_openai_format(mcp_tools)
-
-        while True:
-
-            try:
-                user_input = await session.prompt_async()
-            except KeyboardInterrupt:
-                user_input = "/quit"
-
-            if user_input in ["/exit", "/quit", "/q"]:
-                break
-
-            if user_input == "/config":
-                ui.print(f"[bold blue]Current config file:[/bold blue] {config}")
-                continue
-
-            initial_turn = create_initial_turn(config, user_input)
-            await complete_turn(
-                initial_turn=initial_turn,
-                config=config,
-                client=client,
-                tools=openai_tools,
-                ui=ui,
-            )
-            ui.print("\n")
-
-
 def main():
-    ui = TurnUI()
     parser = create_parser()
     args = parser.parse_args()
 
     if args.version:
-        ui.print(f"{settings.ASSISTANT_NAME} version {settings.version}")
+        print(f"{settings.ASSISTANT_NAME} version {settings.VERSION}")
         return
 
     config = load_config(args.config)
 
-    client = Client(config)
+    # Import UI components AFTER parsing config
+    from astrid.llm_ui import make_app
 
-    asyncio.run(run_repl(config=config, client=client, ui=ui))
+    # No scenario selection — set a default
+    scenario_key = "default"
+    scenario_label = "Default Assistant"
+
+    async def runner():
+        client = Client(config)
+
+        async with client:
+            engine = LLMEngine(config=config, client=client)
+            await engine.initialize()
+
+            app = make_app(
+                scenario_key=scenario_key,
+                scenario_label=scenario_label,
+                engine=engine,
+            )
+
+            # Run the prompt_toolkit full-screen UI
+            await app.run_async()
+
+    asyncio.run(runner())
