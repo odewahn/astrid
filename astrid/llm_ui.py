@@ -103,7 +103,7 @@ def make_app(
 
     input_window = Window(
         content=input_control,
-        height=1,  # visible height in rows
+        height=3,  # visible height in rows
         style="class:input",
     )
 
@@ -117,9 +117,9 @@ def make_app(
             navbar,
             separator,
             output,
-            status_bar,
             separator,
             input_window,
+            status_bar,
         ]
     )
 
