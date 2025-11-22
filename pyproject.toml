@@ -10,8 +10,14 @@ dependencies = [
     "pyyaml",
     "fastmcp",
     "openai",
-    "pydantic"
+    "pydantic",
+    "rich",
+    "art"
 ]
 
 [project.scripts]
 astrid = "astrid.__main__:main"
+
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
