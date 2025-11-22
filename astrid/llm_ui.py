@@ -61,6 +61,7 @@ class REPLTurnUI:
         self._stop_event: Optional[asyncio.Event] = None
         self._spinner_label: str = ""
         self._last_render_len: int = 0
+        self._characters_printed: int = 0
 
     # --- Internal spinner logic ----------------------------------------
 
@@ -136,6 +137,13 @@ class REPLTurnUI:
         if self._stop_event is not None:
             self._stop_event.set()
         # Let the worker clear its line and exit; no need to cancel explicitly.
+        if self._last_render_len > 0:
+            # clear the line
+            sys.stderr.write("\r" + " " * self._last_render_len)
+            # move to beginning of *next* line
+            sys.stderr.write("\r")
+            sys.stderr.flush()
+            self._last_render_len = 0
 
     # --- TurnUI interface used by LLMEngine / complete_turn -------------
 
@@ -160,6 +168,24 @@ class REPLTurnUI:
         We keep this raw (no Rich) so streaming is as simple and robust
         as possible.
         """
+        max_width = (console.size.width - 1) if console else 80
+
+        # If printing the token would put us over the max_width, add a newline first
+        # and then reset the character count.
+        if self._characters_printed + len(text) > max_width:
+            sys.stdout.write("\n")
+            sys.stdout.write(text)
+            sys.stdout.flush()
+            self._characters_printed = len(text)
+            return
+
+        # If the token contains newlines, we need to reset the character count
+        # after the last newline.
+        if "\n" in text:
+            self._characters_printed = 0
+        else:
+            self._characters_printed += len(text)
+
         sys.stdout.write(text)
         sys.stdout.flush()
 
@@ -178,6 +204,7 @@ class REPLTurnUI:
             text = text[:-1]
 
         console.print(text)
+        self._characters_printed = 0
 
 
 # ---------------------------------------------------------------------------
