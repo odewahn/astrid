@@ -210,6 +210,24 @@ class REPLTurnUI:
 # ---------------------------------------------------------------------------
 # REPL "app" wrapper
 # ---------------------------------------------------------------------------
+def print_credentials(console) -> None:
+    console.print("\n")
+    console.print(
+        Panel(
+            Text.from_markup(
+                f"[bold]Console Login Credentials[/]\n\n"
+                f"Copy/paste the following credentials to log into the lab's companion console.\n"
+                f"Be sure to use private browsing window to prevent conflicts with other sessions.\n\n"
+                f"  [blue]URL:[/] {settings.console_url}\n"
+                f"  [yellow]Username:[/] {settings.console_username}\n"
+                f"  [yellow]Password:[/] {settings.console_password}\n"
+                f"\nYou can repeat this command at any time by typing [yellow]/creds[/]."
+            ),
+            border_style="green",
+            title="Credentials",
+        )
+    )
+    console.print("\n")
 
 
 class ReplApp:
@@ -220,8 +238,7 @@ class ReplApp:
     using REPLTurnUI.
     """
 
-    def __init__(self, scenario_key: str, scenario_label: str, engine: Any) -> None:
-        self.scenario_key = scenario_key
+    def __init__(self, scenario_label: str, engine: Any) -> None:
         self.scenario_label = scenario_label
         self.engine = engine
 
@@ -247,12 +264,7 @@ class ReplApp:
             # Shown only while waiting for user input (prompt visible).
             # When work is in progress, the indeterminate spinner is
             # rendered on stderr instead.
-            human_status = status["text"] or "Idle"
-            return (
-                f" {settings.ASSISTANT_NAME} · {self.scenario_label} "
-                f"| Status: {human_status} "
-                "| /help /config /exit"
-            )
+            return f"/creds /exit /help | {self.scenario_label[:50]}... "
 
         # Colorized prompt: entire "[user]> " in green
         prompt_message = HTML(f"<ansigreen>{settings.ASSISTANT_NAME}&gt; </ansigreen>")
@@ -264,9 +276,10 @@ class ReplApp:
 
         ui = REPLTurnUI(set_status_callback=set_status)
 
+        """
         # Banner (Rich)
         title = Text(settings.ASSISTANT_NAME, style="bold cyan")
-        subtitle = Text(f"{self.scenario_label} ({self.scenario_key})", style="magenta")
+        subtitle = Text(f"{self.scenario_label} , style="magenta")
         banner_text = Text.assemble(title, Text(" – "), subtitle)
 
         console.print(
@@ -281,6 +294,7 @@ class ReplApp:
             "[yellow]/config[/] [bold]for config,[/] "
             "[yellow]/exit[/] [bold]to quit.[/]\n"
         )
+        """
 
         # Main REPL loop
         while True:
@@ -302,6 +316,11 @@ class ReplApp:
             if text in ("/exit", "/quit"):
                 console.print("[bold red]Goodbye.[/]")
                 break
+
+            # Print the console login credentials
+            if text == "/creds":
+                print_credentials(console=console)
+                continue
 
             if text == "/help":
                 console.print(
@@ -336,7 +355,6 @@ class ReplApp:
 
 
 def make_app(
-    scenario_key: str,
     scenario_label: str,
     engine: Any,
 ) -> ReplApp:
@@ -352,7 +370,6 @@ def make_app(
     a ReplApp that manages a PromptSession-based REPL instead.
     """
     return ReplApp(
-        scenario_key=scenario_key,
         scenario_label=scenario_label,
         engine=engine,
     )

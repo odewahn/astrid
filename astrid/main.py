@@ -2,6 +2,9 @@ import asyncio
 import argparse
 
 from art import text2art
+from rich import print
+from rich.panel import Panel
+from rich.console import Console
 
 from prompt_toolkit import PromptSession
 from prompt_toolkit.patch_stdout import patch_stdout
@@ -25,10 +28,8 @@ from fastmcp import Client
 
 # Turn off Pydantic deprecation warnings that happen with fastmcp
 import warnings
-from pydantic import PydanticDeprecatedSince20, PydanticDeprecatedSince211
 
-warnings.filterwarnings("ignore", category=PydanticDeprecatedSince20)
-warnings.filterwarnings("ignore", category=PydanticDeprecatedSince211)
+warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 
 # **********************************************************************
@@ -192,19 +193,23 @@ def create_initial_turn(config, user_input: str) -> "Turn":
 def main():
     parser = create_parser()
     args = parser.parse_args()
+    console = Console()
 
     if args.version:
         print(f"{settings.ASSISTANT_NAME} version {settings.VERSION}")
         return
 
+    Art = text2art(settings.ASSISTANT_NAME, font="slant")
+    console.print(f"[green]{Art}[/green]")
+    console.print(f"{settings.ASSISTANT_NAME} version {settings.VERSION}")
+    console.print("\n")
+
     config = load_config(args.config)
 
     # Import UI components AFTER parsing config
-    from astrid.llm_ui import make_app
+    from astrid.llm_ui import make_app, print_credentials
 
-    # No scenario selection — set a default
-    scenario_key = "default"
-    scenario_label = "Default Assistant"
+    print_credentials(console=console)
 
     async def runner():
         client = Client(config)
@@ -214,8 +219,7 @@ def main():
             await engine.initialize()
 
             app = make_app(
-                scenario_key=scenario_key,
-                scenario_label=scenario_label,
+                scenario_label=config.get("title", "Default Scenario"),
                 engine=engine,
             )
 

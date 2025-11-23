@@ -1,4 +1,5 @@
 model: openai/gpt-4o-mini
+title: Jive talkin funky pirate bastard
 
 system_prompt: >2
   Always respond like a pirate
@@ -28,7 +29,7 @@ mcpServers:
       MY_ENV_VAR: "FART FACE!"
 
 
-  discovery:
-    transport: sse
-    url: http://localhost:8192/sse
-    auth_type: none
+  #discovery:
+  #  transport: sse
+  #  url: http://localhost:8192/sse
+  #  auth_type: none

@@ -1,3 +1,6 @@
+import os
+
+
 class Settings:
     """Application configuration, loaded from environment or defaults."""
 
@@ -9,6 +12,10 @@ class Settings:
     DEFAULT_SYSTEM_PROMPT: str = (
         "You are Astrid, an AI assistant that helps users with a variety of tasks."
     )
+
+    console_url = os.environ.get("console_url", None)
+    console_username = os.environ.get("email", None)
+    console_password = os.environ.get("password", None)
 
 
 settings = Settings()
