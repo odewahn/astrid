@@ -1,6 +1,7 @@
 import asyncio
 import argparse
 import rich
+import sys
 
 from rich.console import Console
 
@@ -168,20 +169,21 @@ def create_initial_turn(config, user_input: str) -> "Turn":
     return turn
 
 
+from typing import Dict
+
+
 async def run_repl(
-    config: dict, client: Client, tools: List[ChatCompletionToolParam]
+    config: dict,
+    client: Client,
+    tools: List[ChatCompletionToolParam],
+    ui: REPLTurnUI,
+    status: Dict[str, str],
 ) -> None:
     console = Console()
 
-    # Shared status for bottom toolbar
-    status = {"text": ""}
-
-    def set_status(text: str) -> None:
-        status["text"] = text or ""
-
     def bottom_toolbar() -> str:
         base = f"{config['title']} | /help /config /creds /exit"
-        if status["text"]:
+        if status.get("text"):
             return f"{base} | {status['text']}"
         return base
 
@@ -190,8 +192,6 @@ async def run_repl(
         prompt_message,
         bottom_toolbar=bottom_toolbar,
     )
-
-    ui = REPLTurnUI(set_status_callback=set_status)
 
     while True:
         try:
@@ -236,6 +236,9 @@ async def run_repl(
             ui=ui,
         )
 
+        sys.stdout.write("\n\n")
+        sys.stdout.flush()
+
 
 def main():
     parser = create_parser()
@@ -251,17 +254,32 @@ def main():
     console.print("\n")
 
     config = load_config(args.config)
-
     print_credentials(console=console)
+
+    # ---- status + callback live here ----
+    status = {"text": ""}
+
+    def set_status(text: str) -> None:
+        status["text"] = text or ""
+
+    # UI is composed here and passed into run_repl
+    ui = REPLTurnUI(set_status_callback=set_status)
 
     async def runner():
         client = Client(config)
 
+        ui.set_status("Connecting to MCP server...")
         async with client:
             # Fetch MCP tools once and convert to OpenAI format
             mcp_tools = await client.list_tools()
             tools = convert_mcp_tools_to_openai_format(mcp_tools)
-
-            await run_repl(config=config, client=client, tools=tools)
+            ui.hide_status()
+            await run_repl(
+                config=config,
+                client=client,
+                tools=tools,
+                ui=ui,
+                status=status,
+            )
 
     asyncio.run(runner())
