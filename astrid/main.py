@@ -17,7 +17,10 @@ from astrid.utils import (
     run_tool,
 )
 from astrid.conversation import Turn
-from astrid.ptk_turn_ui import PTKTurnUI
+from astrid.llm_ui import REPLTurnUI
+
+from prompt_toolkit.formatted_text import HTML
+from astrid.llm_ui import REPLTurnUI, print_credentials
 
 from typing import Optional, List
 from openai.types.chat import ChatCompletionToolParam
@@ -57,42 +60,12 @@ def create_parser() -> argparse.ArgumentParser:
     return parser
 
 
-# **********************************************************************
-# Core turn completion logic
-# **********************************************************************
-class LLMEngine:
-    def __init__(self, config: dict, client: Client):
-        self.config = config
-        self.client = client
-        self.tools = None
-
-    async def initialize(self):
-        mcp_tools = await self.client.list_tools()
-        self.tools = convert_mcp_tools_to_openai_format(mcp_tools)
-
-    async def handle_user_message(self, user_input: str, ui) -> None:
-        # Mirror the REPL’s commands as needed; you can also handle /exit at TUI level.
-        if user_input == "/config":
-            ui.print(f"Current config: {self.config}")
-            return
-
-        initial_turn = create_initial_turn(self.config, user_input)
-        await complete_turn(
-            initial_turn=initial_turn,
-            config=self.config,
-            client=self.client,
-            tools=self.tools,
-            ui=ui,
-        )
-        ui.print("")  # blank line after each turn
-
-
 async def complete_turn(
     initial_turn: Turn,
     config: dict = None,
     client: Client = None,
     tools: Optional[List[ChatCompletionToolParam]] = None,
-    ui: Optional[PTKTurnUI] = None,
+    ui: Optional[REPLTurnUI] = None,
     max_tool_loops: int = 4,
 ):
 
@@ -190,6 +163,101 @@ def create_initial_turn(config, user_input: str) -> "Turn":
     return turn
 
 
+async def run_repl(
+    config: dict, client: Client, tools: List[ChatCompletionToolParam]
+) -> None:
+    console = Console()
+
+    # Shared status for bottom toolbar
+    status = {"text": ""}
+
+    def set_status(text: str) -> None:
+        status["text"] = text or ""
+
+    def bottom_toolbar() -> str:
+        base = "/help /config /creds /exit"
+        if status["text"]:
+            return f"{config.title} | {status['text']}"
+        return base
+
+    prompt_message = HTML(f"<ansigreen>{settings.ASSISTANT_NAME}&gt; </ansigreen>")
+    session = PromptSession(
+        prompt_message,
+        bottom_toolbar=bottom_toolbar,
+    )
+
+    ui = REPLTurnUI(set_status_callback=set_status)
+
+    console.print(
+        "[bold]Type[/] [yellow]/help[/] [bold]for help,[/] "
+        "[yellow]/config[/] [bold]for config,[/] "
+        "[yellow]/creds[/] [bold]for console credentials,[/] "
+        "[yellow]/exit[/] [bold]to quit.[/]\n"
+    )
+
+    while True:
+        try:
+            with patch_stdout():
+                user_input = await session.prompt_async()
+        except (KeyboardInterrupt, EOFError):
+            console.print("\n[bold red]Exiting.[/]")
+            break
+
+        if user_input is None:
+            continue
+
+        text = user_input.strip()
+        if not text:
+            continue
+
+        # REPL commands handled right here
+        if text in ("/exit", "/quit"):
+            console.print("[bold red]Goodbye.[/]")
+            break
+
+        if text == "/config":
+            ui.print(f"Current config: {config}")
+            continue
+
+        if text == "/creds":
+            print_credentials(console=console)
+            continue
+
+        if text == "/help":
+            console.print(
+                Panel(
+                    "\n".join(
+                        [
+                            "/help   - show this help",
+                            "/config - show current config",
+                            "/creds  - show console login info",
+                            "/exit   - quit the REPL",
+                        ]
+                    ),
+                    title="Commands",
+                    border_style="cyan",
+                )
+            )
+            continue
+
+        # Normal user input -> build a Turn and call complete_turn directly
+        initial_turn = create_initial_turn(config, text)
+
+        await complete_turn(
+            initial_turn=initial_turn,
+            config=config,
+            client=client,
+            tools=tools,
+            ui=ui,
+        )
+
+        # Separate turns with a blank line
+        import sys as _sys
+
+        _sys.stdout.write("\n")
+        _sys.stdout.flush()
+
+
 def main():
     parser = create_parser()
     args = parser.parse_args()
@@ -206,8 +274,8 @@ def main():
 
     config = load_config(args.config)
 
-    # Import UI components AFTER parsing config
-    from astrid.llm_ui import make_app, print_credentials
+    # Print initial credentials hint (optional)
+    from astrid.llm_ui import print_credentials
 
     print_credentials(console=console)
 
@@ -215,15 +283,10 @@ def main():
         client = Client(config)
 
         async with client:
-            engine = LLMEngine(config=config, client=client)
-            await engine.initialize()
+            # Fetch MCP tools once and convert to OpenAI format
+            mcp_tools = await client.list_tools()
+            tools = convert_mcp_tools_to_openai_format(mcp_tools)
 
-            app = make_app(
-                scenario_label=config.get("title", "Default Scenario"),
-                engine=engine,
-            )
-
-            # Run the prompt_toolkit full-screen UI
-            await app.run_async()
+            await run_repl(config=config, client=client, tools=tools)
 
     asyncio.run(runner())
