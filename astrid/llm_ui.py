@@ -228,3 +228,22 @@ def print_credentials(console) -> None:
         )
     )
     console.print("\n")
+
+
+def print_help(console) -> None:
+    console.print("\n")
+    console.print(
+        Panel(
+            Text.from_markup(
+                f"[bold]Help - Available Commands[/]\n\n"
+                f"  [yellow]/help[/]      Show this help message.\n"
+                f"  [yellow]/config[/]    Display the current configuration.\n"
+                f"  [yellow]/creds[/]     Show console login credentials.\n"
+                f"  [yellow]/exit[/]      Exit the application.\n"
+                f"\nType your message and press Enter to interact with the assistant."
+            ),
+            border_style="blue",
+            title="Help",
+        )
+    )
+    console.print("\n")

@@ -1,32 +1,37 @@
 import asyncio
 import argparse
+import rich
 
-from art import text2art
-from rich import print
-from rich.panel import Panel
 from rich.console import Console
 
-from prompt_toolkit import PromptSession
-from prompt_toolkit.patch_stdout import patch_stdout
-
+console = Console()
 from astrid.settings import settings
-from astrid.utils import (
-    load_config,
-    convert_mcp_tools_to_openai_format,
-    safe_json_loads,
-    run_tool,
-)
-from astrid.conversation import Turn
-from astrid.llm_ui import REPLTurnUI
 
-from prompt_toolkit.formatted_text import HTML
-from astrid.llm_ui import REPLTurnUI, print_credentials
+version_string = f"{settings.ASSISTANT_NAME} version {settings.VERSION}"
 
-from typing import Optional, List
-from openai.types.chat import ChatCompletionToolParam
+with console.status(f"Loading {version_string}..."):
 
-from litellm import acompletion, stream_chunk_builder
-from fastmcp import Client
+    from art import text2art
+
+    from prompt_toolkit import PromptSession
+    from prompt_toolkit.patch_stdout import patch_stdout
+    from prompt_toolkit.formatted_text import HTML
+
+    from astrid.utils import (
+        load_config,
+        convert_mcp_tools_to_openai_format,
+        safe_json_loads,
+        run_tool,
+    )
+    from astrid.conversation import Turn
+
+    from astrid.llm_ui import REPLTurnUI, print_credentials, print_help
+
+    from typing import Optional, List
+    from openai.types.chat import ChatCompletionToolParam
+
+    from litellm import acompletion, stream_chunk_builder
+    from fastmcp import Client
 
 
 # Turn off Pydantic deprecation warnings that happen with fastmcp
@@ -175,9 +180,9 @@ async def run_repl(
         status["text"] = text or ""
 
     def bottom_toolbar() -> str:
-        base = "/help /config /creds /exit"
+        base = f"{config['title']} | /help /config /creds /exit"
         if status["text"]:
-            return f"{config.title} | {status['text']}"
+            return f"{base} | {status['text']}"
         return base
 
     prompt_message = HTML(f"<ansigreen>{settings.ASSISTANT_NAME}&gt; </ansigreen>")
@@ -187,13 +192,6 @@ async def run_repl(
     )
 
     ui = REPLTurnUI(set_status_callback=set_status)
-
-    console.print(
-        "[bold]Type[/] [yellow]/help[/] [bold]for help,[/] "
-        "[yellow]/config[/] [bold]for config,[/] "
-        "[yellow]/creds[/] [bold]for console credentials,[/] "
-        "[yellow]/exit[/] [bold]to quit.[/]\n"
-    )
 
     while True:
         try:
@@ -224,20 +222,7 @@ async def run_repl(
             continue
 
         if text == "/help":
-            console.print(
-                Panel(
-                    "\n".join(
-                        [
-                            "/help   - show this help",
-                            "/config - show current config",
-                            "/creds  - show console login info",
-                            "/exit   - quit the REPL",
-                        ]
-                    ),
-                    title="Commands",
-                    border_style="cyan",
-                )
-            )
+            print_help(console=console)
             continue
 
         # Normal user input -> build a Turn and call complete_turn directly
@@ -251,20 +236,13 @@ async def run_repl(
             ui=ui,
         )
 
-        # Separate turns with a blank line
-        import sys as _sys
-
-        _sys.stdout.write("\n")
-        _sys.stdout.flush()
-
 
 def main():
     parser = create_parser()
     args = parser.parse_args()
-    console = Console()
 
     if args.version:
-        print(f"{settings.ASSISTANT_NAME} version {settings.VERSION}")
+        print(version_string)
         return
 
     Art = text2art(settings.ASSISTANT_NAME, font="slant")
@@ -273,9 +251,6 @@ def main():
     console.print("\n")
 
     config = load_config(args.config)
-
-    # Print initial credentials hint (optional)
-    from astrid.llm_ui import print_credentials
 
     print_credentials(console=console)
 
