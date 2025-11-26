@@ -1,6 +1,6 @@
 [project]
 name = "astrid"
-version = "0.1.0"
+version = "0.1.1"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -22,3 +22,6 @@ astrid = "astrid.__main__:main"
 [build-system]
 requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["astrid"]
