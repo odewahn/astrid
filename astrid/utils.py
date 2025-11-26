@@ -1,10 +1,18 @@
 from typing import Optional, Callable, List, Any, Dict
 import json
+import git
+import os
+import shutil
 
 from openai.types.chat import ChatCompletionToolParam
 import yaml
 
 from fastmcp.exceptions import ToolError
+
+
+def load_file(file_path: str) -> str:
+    with open(file_path, "r") as f:
+        return f.read()
 
 
 def load_config(config_fn: str) -> dict:
@@ -78,3 +86,25 @@ async def run_tool(client, name: str, args: dict) -> str:
         },
         default=str,
     )
+
+
+def clone_repo(repo_url: str, dest_dir: str, overwrite: bool = False) -> None:
+
+    if os.path.exists(dest_dir):
+        if overwrite:
+            # If the destination error exists and overwrite is true, remove it
+            shutil.rmtree(dest_dir)
+        else:
+            # If the destination exists and overwrite is false, raise an error
+            raise FileExistsError(f"Destination directory '{dest_dir}' already exists.")
+    # Clone the repository
+    try:
+        repo = git.Repo.clone_from(
+            repo_url,
+            dest_dir,
+            branch="main",
+        )
+    except Exception as e:
+        raise RuntimeError(
+            f"Failed to clone repository from {repo_url} to {dest_dir}: {e}"
+        ) from e

@@ -79,7 +79,7 @@ class REPLTurnUI:
             i += 1
 
             label = self._spinner_label or "Working"
-            line = f"[{frame}] {label} (Ctrl-C to abort)"
+            line = f"[{frame}] {label}"
 
             # Render on a single line, overwriting previous contents.
             render = "\r" + line

@@ -12,7 +12,8 @@ dependencies = [
     "openai",
     "pydantic",
     "rich",
-    "art"
+    "art",
+    "GitPython"
 ]
 
 [project.scripts]

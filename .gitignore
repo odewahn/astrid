@@ -1,4 +1,5 @@
 .DS_Store
+.astrid-content
 
 # Python-generated files
 __pycache__/

@@ -17,5 +17,8 @@ class Settings:
     console_username = os.environ.get("email", None)
     console_password = os.environ.get("password", None)
 
+    REPO_CONTENT_DIR: str = os.path.join(os.getcwd(), ".astrid-content")
+    REPO_CONFIG_FILE: str = f"{REPO_CONTENT_DIR}/index.yaml"
+
 
 settings = Settings()

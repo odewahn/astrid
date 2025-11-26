@@ -1,7 +1,7 @@
 import asyncio
 import argparse
-import rich
 import sys
+import os
 
 from rich.console import Console
 
@@ -23,6 +23,8 @@ with console.status(f"Loading {version_string}..."):
         convert_mcp_tools_to_openai_format,
         safe_json_loads,
         run_tool,
+        clone_repo,
+        load_file,
     )
     from astrid.conversation import Turn
 
@@ -60,9 +62,17 @@ def create_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--config",
         "-c",
-        default=settings.DEFAULT_CONFIG_FILE,
+        default=None,
         help=(f"Path to config file"),
     )
+
+    parser.add_argument(
+        "--repo",
+        "-r",
+        default=None,
+        help="URL of the git repository to clone",
+    )
+
     return parser
 
 
@@ -146,7 +156,7 @@ async def complete_turn(
             args = safe_json_loads(arg_str)
 
             if ui:
-                ui.set_status(f"Running '{name}' with {arg_str[:20]}...")
+                ui.set_status(f"Running '{name}' with {arg_str[:100]}...")
 
             result = await run_tool(client, name, args)
 
@@ -241,6 +251,11 @@ async def run_repl(
 
 
 def main():
+    Art = text2art(settings.ASSISTANT_NAME, font="slant")
+    console.print(f"[green]{Art}[/green]")
+    console.print(f"{settings.ASSISTANT_NAME} version {settings.VERSION}")
+    console.print("\n")
+
     parser = create_parser()
     args = parser.parse_args()
 
@@ -248,12 +263,51 @@ def main():
         print(version_string)
         return
 
-    Art = text2art(settings.ASSISTANT_NAME, font="slant")
-    console.print(f"[green]{Art}[/green]")
-    console.print(f"{settings.ASSISTANT_NAME} version {settings.VERSION}")
-    console.print("\n")
+    # ensure they've entered a config or a repo, but not both!
+    if not args.config and not args.repo:
+        console.print(
+            "[red]Error: You must supply either a config file (--config) or a repository URL (--repo).[/red]"
+        )
+        return
 
-    config = load_config(args.config)
+    # If they've supplied a repo URL, clone it to the content directory if it doesn't exist
+    # Note that this needs to happen before loading the config, since the config may be in the repo
+    # So, keep it before loading the config for the repo option
+    if args.repo:
+        try:
+            clone_repo(args.repo, settings.REPO_CONTENT_DIR, overwrite=False)
+            console.print(
+                f"[green]Cloned repository from {args.repo} to {settings.CONTENT_DIR}[/green]"
+            )
+        except FileExistsError:
+            console.print(
+                f"[yellow]Directory {settings.REPO_CONTENT_DIR} already exists. Skipping clone.[/yellow]"
+            )
+        except Exception as e:
+            console.print(f"[red]Failed to clone repository: {e}[/red]")
+            return
+
+    # If they've supplied a repo, then load the config from it and ask them which scenario they want to run
+    if args.repo:
+        config = load_config(settings.REPO_CONFIG_FILE)
+        for i, content in enumerate(config.get("contents", [])):
+            console.print(f"[{i}] {content.get('title', 'Untitled Scenario')}")
+        choice = console.input("Select a scenario by number: ")
+        try:
+            choice_idx = int(choice)
+            content_fn = config["contents"][choice_idx]["filename"]
+            system_prompt = load_file(
+                os.path.join(settings.REPO_CONTENT_DIR, content_fn)
+            )
+            config["system_prompt"] = system_prompt
+        except (ValueError, IndexError):
+            console.print(f"[red]Invalid selection '{choice}'. Exiting.[/red]")
+            return
+
+    if args.config:
+        config = load_config(args.config)
+
+    # Begin the loop
     print_credentials(console=console)
 
     # ---- status + callback live here ----
