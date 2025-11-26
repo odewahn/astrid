@@ -307,6 +307,18 @@ def main():
     if args.config:
         config = load_config(args.config)
 
+    # Patch in any inherited shell variables from the environment
+
+    inherited = config.get("inherited_shell_variables", []) or []
+    for server_name, server_cfg in config.get("mcpServers", {}).items():
+        # Preserve any existing env config
+        env = server_cfg.setdefault("env", {})
+
+        # Merge in inherited vars *without* overwriting existing keys
+        for var in inherited:
+            if var in os.environ and var not in env:
+                env[var] = os.environ[var]
+
     # Begin the loop
     print_credentials(console=console)
 
