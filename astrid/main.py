@@ -25,6 +25,7 @@ with console.status(f"Loading {version_string}..."):
         run_tool,
         clone_repo,
         load_file,
+        load_and_decrypt_env,
     )
     from astrid.conversation import Turn
 
@@ -35,6 +36,8 @@ with console.status(f"Loading {version_string}..."):
 
     from litellm import acompletion, stream_chunk_builder
     from fastmcp import Client
+    from fastmcp.exceptions import ToolError  # if not already imported
+    import traceback
 
 
 # Turn off Pydantic deprecation warnings that happen with fastmcp
@@ -71,6 +74,14 @@ def create_parser() -> argparse.ArgumentParser:
         "-r",
         default=None,
         help="URL of the git repository to clone",
+    )
+    parser.add_argument(
+        "--dangerouslyInsecurePassword",
+        action="store_true",
+        help=(
+            "Prompt for password to decrypt ENCRYPTED_ANTHROPIC_API_KEY "
+            "and override the plaintext API key in memory"
+        ),
     )
 
     return parser
@@ -158,7 +169,21 @@ async def complete_turn(
             if ui:
                 ui.set_status(f"Running '{name}' with {arg_str[:100]}...")
 
-            result = await run_tool(client, name, args)
+            try:
+                result = await run_tool(client, name, args)
+            except Exception as e:
+                # Don’t crash the REPL – turn this into a tool “error result”
+                if ui:
+                    ui.hide_status()
+
+                tb = traceback.format_exc()
+                # You can make this as structured as you like; simple text works fine
+                result = (
+                    f"TOOL_ERROR: Tool '{name}' failed.\n"
+                    f"Error: {e}\n"
+                    f"Original arguments: {arg_str}\n"
+                    f"Traceback:\n{tb}"
+                )
 
             if ui:
                 ui.hide_status()
@@ -250,6 +275,23 @@ async def run_repl(
         sys.stdout.flush()
 
 
+async def discover_all_tools(config):
+    all_tools = []
+    # config["mcpServers"] is a dict of {name: server_cfg}
+    for name, server_cfg in config.get("mcpServers", {}).items():
+        single_cfg = {"mcpServers": {name: server_cfg}}
+        try:
+            async with Client(single_cfg) as c:
+                server_tools = await c.list_tools()
+                # Optionally prefix names with the server name to avoid collisions
+                for t in server_tools:
+                    t.name = f"{name}_{t.name}"
+                all_tools.extend(server_tools)
+        except Exception as e:
+            console.print(f"[red]Failed to list tools from server {name}: {e}[/red]")
+    return all_tools
+
+
 def main():
     Art = text2art(settings.ASSISTANT_NAME, font="slant")
     console.print(f"[green]{Art}[/green]")
@@ -270,6 +312,18 @@ def main():
         )
         return
 
+    # If requested, decrypt the wrapped Anthropic key and override the plain var
+    if args.dangerouslyInsecurePassword:
+        try:
+            decrypted = load_and_decrypt_env("ENCRYPTED_ANTHROPIC_API_KEY")
+        except Exception as e:
+            console.print(
+                f"[bold red]Error unlocking ENCRYPTED_ANTHROPIC_API_KEY:[/] {e}"
+            )
+            raise SystemExit(1)
+
+        os.environ["ANTHROPIC_API_KEY"] = decrypted
+
     # If they've supplied a repo URL, clone it to the content directory if it doesn't exist
     # Note that this needs to happen before loading the config, since the config may be in the repo
     # So, keep it before loading the config for the repo option
@@ -277,7 +331,7 @@ def main():
         try:
             clone_repo(args.repo, settings.REPO_CONTENT_DIR, overwrite=False)
             console.print(
-                f"[green]Cloned repository from {args.repo} to {settings.CONTENT_DIR}[/green]"
+                f"[green]Cloned repository from {args.repo} to {settings.REPO_CONTENT_DIR}[/green]"
             )
         except FileExistsError:
             console.print(
@@ -337,7 +391,8 @@ def main():
         ui.set_status("Connecting to MCP server...")
         async with client:
             # Fetch MCP tools once and convert to OpenAI format
-            mcp_tools = await client.list_tools()
+            # mcp_tools = await client.list_tools()
+            mcp_tools = await discover_all_tools(config)
             tools = convert_mcp_tools_to_openai_format(mcp_tools)
             ui.hide_status()
             await run_repl(
