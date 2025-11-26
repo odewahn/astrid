@@ -4,7 +4,7 @@ import os
 class Settings:
     """Application configuration, loaded from environment or defaults."""
 
-    VERSION: str = "0.1.1"
+    VERSION: str = "0.1.2"
     ASSISTANT_NAME: str = "Astrid"
     DEFAULT_CONFIG_FILE: str = "config.yaml"
 
