@@ -312,18 +312,6 @@ def main():
         )
         return
 
-    # If requested, decrypt the wrapped Anthropic key and override the plain var
-    if args.dangerouslyInsecurePassword:
-        try:
-            decrypted = load_and_decrypt_env("ENCRYPTED_ANTHROPIC_API_KEY")
-        except Exception as e:
-            console.print(
-                f"[bold red]Error unlocking ENCRYPTED_ANTHROPIC_API_KEY:[/] {e}"
-            )
-            raise SystemExit(1)
-
-        os.environ["ANTHROPIC_API_KEY"] = decrypted
-
     # If they've supplied a repo URL, clone it to the content directory if it doesn't exist
     # Note that this needs to happen before loading the config, since the config may be in the repo
     # So, keep it before loading the config for the repo option
@@ -360,6 +348,26 @@ def main():
 
     if args.config:
         config = load_config(args.config)
+
+    # If requested, decrypt the wrapped Anthropic key and override the plain var
+    if args.dangerouslyInsecurePassword:
+        model = config.get("model", settings.DEFAULT_MODEL).upper().replace("-", "_")
+        provider_pair = model.split("/")
+        if len(provider_pair) != 2:
+            console.print(
+                f"[bold red]Error:[/] Unable to determine provider from model name '{model}'"
+            )
+            return
+        provider = provider_pair[0]
+        decrypted_api_key_name = f"{provider}_API_KEY"
+        encrypted_api_key_name = f"ENCRYPTED_{provider}_API_KEY"
+        try:
+            decrypted = load_and_decrypt_env(encrypted_api_key_name)
+        except Exception as e:
+            raise SystemExit(1)
+        console.print(f"[bold yellow]Setting {decrypted_api_key_name}")
+        console.print(f"[bold yellow]decrypted value {decrypted}[/]")
+        os.environ[decrypted_api_key_name] = decrypted
 
     # Patch in any inherited shell variables from the environment
 
