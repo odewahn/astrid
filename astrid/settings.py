@@ -13,6 +13,11 @@ class Settings:
         "You are Astrid, an AI assistant that helps users with a variety of tasks."
     )
 
+    MAX_HISTORY_TOKENS: int = 4000
+
+    # Log file goes to current working direcotory + filename
+    CONVERSATION_LOG_FILE: str = os.path.join(os.getcwd(), "conversation_log.json")
+
     console_url = os.environ.get("console_url", None)
     console_username = os.environ.get("email", None)
     console_password = os.environ.get("password", None)

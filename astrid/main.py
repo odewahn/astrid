@@ -26,12 +26,13 @@ with console.status(f"Loading {version_string}..."):
         clone_repo,
         load_file,
         load_and_decrypt_env,
+        discover_all_tools,
     )
-    from astrid.conversation import Turn
+    from astrid.conversation import Turn, Conversation
 
     from astrid.llm_ui import REPLTurnUI, print_credentials, print_help
 
-    from typing import Optional, List
+    from typing import Optional, List, Dict
     from openai.types.chat import ChatCompletionToolParam
 
     from litellm import acompletion, stream_chunk_builder
@@ -84,6 +85,11 @@ def create_parser() -> argparse.ArgumentParser:
         ),
     )
 
+    parser.add_argument(
+        "--log",
+        action="store_true",
+        help=("Enable logging of conversation to a file"),
+    )
     return parser
 
 
@@ -197,14 +203,56 @@ async def complete_turn(
     return new_turn
 
 
-def create_initial_turn(config, user_input: str) -> "Turn":
+def estimate_tokens(text: str) -> int:
+    # crude approximation: ~1.3 tokens per word
+    return int(len(text.split()) * 1.3)
+
+
+def estimate_pair_tokens(user_text: str, assistant_text: str) -> int:
+    return estimate_tokens(user_text) + estimate_tokens(assistant_text)
+
+
+def select_history_by_token_budget(summary_exchanges, max_tokens):
+    """
+    summary_exchanges is a list like:
+    [
+        {"user": "text...", "assistant": "text..."},
+        ...
+    ]
+    Ordered oldest → newest.
+    """
+    selected = []
+    total = 0
+
+    # iterate newest → oldest
+    for pc in reversed(summary_exchanges):
+        pair_tokens = estimate_pair_tokens(pc["user"], pc["assistant"])
+        if total + pair_tokens > max_tokens:
+            break
+        selected.append(pc)
+        total += pair_tokens
+
+    # reverse back to oldest → newest
+    selected.reverse()
+    return selected
+
+
+def create_initial_turn(config, user_input: str, conversation: Conversation) -> "Turn":
     turn = Turn()
     turn.add_system(config.get("system_prompt", settings.DEFAULT_SYSTEM_PROMPT))
+    # Add prior conversation turns for context
+    full_exchange_history = conversation.get_exchange_summary()
+    # Select only as much history as fits in the token budget
+    exchange_summary = select_history_by_token_budget(
+        full_exchange_history, settings.MAX_HISTORY_TOKENS
+    )
+    summary = "RECENT CONVERSATION HISTORY\n\n" + "\n\n".join(
+        [f"User: {pc['user']}\nAssistant: {pc['assistant']}" for pc in exchange_summary]
+    )
+    turn.add_assistant(summary)
+    # Now add their new input
     turn.add_user(user_input)
     return turn
-
-
-from typing import Dict
 
 
 async def run_repl(
@@ -213,6 +261,8 @@ async def run_repl(
     tools: List[ChatCompletionToolParam],
     ui: REPLTurnUI,
     status: Dict[str, str],
+    conversation: Conversation,
+    args: argparse.Namespace = None,
 ) -> None:
     console = Console()
 
@@ -260,36 +310,27 @@ async def run_repl(
             print_help(console=console)
             continue
 
-        # Normal user input -> build a Turn and call complete_turn directly
-        initial_turn = create_initial_turn(config, text)
+        if text == "/summary":
+            summary = conversation.exchange_summary()
+            continue
 
-        await complete_turn(
+        # Normal user input -> build a Turn and call complete_turn directly
+        initial_turn = create_initial_turn(config, text, conversation=conversation)
+
+        full_turn = await complete_turn(
             initial_turn=initial_turn,
             config=config,
             client=client,
             tools=tools,
             ui=ui,
         )
+        conversation.add_turn(full_turn)
+
+        if args and args.log:
+            conversation.write_to_file(settings.CONVERSATION_LOG_FILE)
 
         sys.stdout.write("\n\n")
         sys.stdout.flush()
-
-
-async def discover_all_tools(config):
-    all_tools = []
-    # config["mcpServers"] is a dict of {name: server_cfg}
-    for name, server_cfg in config.get("mcpServers", {}).items():
-        single_cfg = {"mcpServers": {name: server_cfg}}
-        try:
-            async with Client(single_cfg) as c:
-                server_tools = await c.list_tools()
-                # Optionally prefix names with the server name to avoid collisions
-                for t in server_tools:
-                    t.name = f"{name}_{t.name}"
-                all_tools.extend(server_tools)
-        except Exception as e:
-            console.print(f"[red]Failed to list tools from server {name}: {e}[/red]")
-    return all_tools
 
 
 def main():
@@ -304,6 +345,14 @@ def main():
     if args.version:
         print(version_string)
         return
+
+    if args.log:
+        # delete existing log file if it exists
+        if os.path.exists(settings.CONVERSATION_LOG_FILE):
+            os.remove(settings.CONVERSATION_LOG_FILE)
+        console.print(
+            f"[green]Conversation logging enabled to {settings.CONVERSATION_LOG_FILE}"
+        )
 
     # ensure they've entered a config or a repo, but not both!
     if not args.config and not args.repo:
@@ -321,7 +370,7 @@ def main():
             console.print(
                 f"[green]Cloned repository from {args.repo} to {settings.REPO_CONTENT_DIR}[/green]"
             )
-        except FileExistsError:
+        except FileExistsError as e:
             console.print(
                 f"[yellow]Directory {settings.REPO_CONTENT_DIR} already exists. Skipping clone.[/yellow]"
             )
@@ -393,6 +442,8 @@ def main():
     # UI is composed here and passed into run_repl
     ui = REPLTurnUI(set_status_callback=set_status)
 
+    conversation = Conversation(system_prompt=config.get("system_prompt"))
+
     async def runner():
         client = Client(config)
 
@@ -409,6 +460,8 @@ def main():
                 tools=tools,
                 ui=ui,
                 status=status,
+                conversation=conversation,
+                args=args,
             )
 
     asyncio.run(runner())

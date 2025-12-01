@@ -8,6 +8,7 @@ import base64
 import json
 from rich.prompt import Prompt
 
+
 from Crypto.Protocol.KDF import scrypt as _scrypt
 from Crypto.Cipher import AES
 
@@ -15,6 +16,7 @@ from openai.types.chat import ChatCompletionToolParam
 import yaml
 
 from fastmcp.exceptions import ToolError
+from fastmcp import Client
 
 
 def load_file(file_path: str) -> str:
@@ -65,6 +67,23 @@ def safe_json_loads(s: str) -> Dict[str, Any]:
         return json.loads(s) if s else {}
     except Exception:
         return {}
+
+
+async def discover_all_tools(config):
+    all_tools = []
+    # config["mcpServers"] is a dict of {name: server_cfg}
+    for name, server_cfg in config.get("mcpServers", {}).items():
+        single_cfg = {"mcpServers": {name: server_cfg}}
+        try:
+            async with Client(single_cfg) as c:
+                server_tools = await c.list_tools()
+                # Optionally prefix names with the server name to avoid collisions
+                for t in server_tools:
+                    t.name = f"{name}_{t.name}"
+                all_tools.extend(server_tools)
+        except Exception as e:
+            raise Exception(f"[red]Failed to list tools from server {name}: {e}[/red]")
+    return all_tools
 
 
 async def run_tool(client, name: str, args: dict) -> str:
@@ -147,7 +166,7 @@ def load_and_decrypt_env(var_name: str = "ENCRYPTED_API_KEY") -> str:
     # Split out ciphertext and 16-byte GCM tag
     ct, tag = data[:-16], data[-16:]
 
-    password = Prompt.ask("Password to unlock secret >", password=True).encode()
+    password = Prompt.ask("Password to unlock secret", password=True).encode()
     key = derive_key(password, salt)
 
     cipher = AES.new(key, AES.MODE_GCM, nonce=nonce)
