@@ -208,10 +208,6 @@ def estimate_tokens(text: str) -> int:
     return int(len(text.split()) * 1.3)
 
 
-def estimate_pair_tokens(user_text: str, assistant_text: str) -> int:
-    return estimate_tokens(user_text) + estimate_tokens(assistant_text)
-
-
 def select_history_by_token_budget(summary_exchanges, max_tokens):
     """
     summary_exchanges is a list like:
@@ -226,7 +222,7 @@ def select_history_by_token_budget(summary_exchanges, max_tokens):
 
     # iterate newest → oldest
     for pc in reversed(summary_exchanges):
-        pair_tokens = estimate_pair_tokens(pc["user"], pc["assistant"])
+        pair_tokens = estimate_tokens(pc["user"]) + estimate_tokens(pc["assistant"])
         if total + pair_tokens > max_tokens:
             break
         selected.append(pc)
@@ -431,7 +427,8 @@ def main():
                 env[var] = os.environ[var]
 
     # Begin the loop
-    print_credentials(console=console)
+    if settings.console_url:
+        print_credentials(console=console)
 
     # ---- status + callback live here ----
     status = {"text": ""}
