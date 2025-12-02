@@ -439,8 +439,6 @@ def main():
     # UI is composed here and passed into run_repl
     ui = REPLTurnUI(set_status_callback=set_status)
 
-    conversation = Conversation(system_prompt=config.get("system_prompt"))
-
     async def runner():
         client = Client(config)
 
@@ -450,6 +448,9 @@ def main():
             # mcp_tools = await client.list_tools()
             mcp_tools = await discover_all_tools(config)
             tools = convert_mcp_tools_to_openai_format(mcp_tools)
+            conversation = Conversation(
+                system_prompt=config.get("system_prompt"), tools=tools
+            )
             ui.hide_status()
             await run_repl(
                 config=config,

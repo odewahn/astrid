@@ -1,5 +1,6 @@
 .DS_Store
 .astrid-content
+conversation_log.json
 
 # Python-generated files
 __pycache__/

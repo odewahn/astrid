@@ -28,6 +28,14 @@ mcpServers:
     env:
       MY_ENV_VAR: "FART FACE!"
 
+  shell_tool:
+    transport: stdio
+    command: bash 
+    args: ["-c", "uvx mcp-shell-server 2>/dev/null"]
+    env:
+      ALLOW_COMMANDS: gcloud, gsutil, bq, python, uv, git, curl, jq, zip, unzip, tar, make, terraform
+
+
 
   #discovery:
   #  transport: sse

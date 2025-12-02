@@ -1,6 +1,7 @@
 from pydantic import BaseModel, Field
 from typing import List, Optional, Union, Any
 
+from openai.types.chat import ChatCompletionToolParam
 from litellm.utils import Message, Usage
 import json
 
@@ -96,6 +97,7 @@ class Turn(BaseModel):
 
 class Conversation(BaseModel):
     system_prompt: Optional[str] = None
+    tools: List[ChatCompletionToolParam] = Field(default_factory=list)
     # avoid mutable default here too
     turns: List[Turn] = Field(default_factory=list)
 
