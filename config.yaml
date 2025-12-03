@@ -9,24 +9,24 @@ initial_message: >2
   To get started, ask me what tools do you have that I can learn about.
 
 mcpServers:
-  date:
-    transport: stdio
-    command: python3
-    args: [/Users/odewahn/Desktop/mcp-work/learn-concurrency/mcp-repl-with-pydantic/servers/mcp_date_server.py]
+  #date:
+  #  transport: stdio
+  #  command: python3
+  #  args: [/Users/odewahn/Desktop/mcp-work/learn-concurrency/mcp-repl-with-pydantic/servers/mcp_date_server.py]
 
 
-  math:
-    transport: stdio
-    command: bash
-    args: ["-c", "python3 /Users/odewahn/Desktop/mcp-work/learn-concurrency/mcp-repl-with-pydantic/servers/mcp_math_server.py 2>/dev/null"]
+  #math:
+  #  transport: stdio
+  #  command: bash
+  #  args: ["-c", "python3 /Users/odewahn/Desktop/mcp-work/learn-concurrency/mcp-repl-with-pydantic/servers/mcp_math_server.py 2>/dev/null"]
 
 
-  env_server:
-    transport: stdio
-    command: bash
-    args: ["-c", "python3 /Users/odewahn/Desktop/mcp-work/learn-concurrency/mcp-repl-with-pydantic/servers/mcp_env_server.py 2>/dev/null"]
-    env:
-      MY_ENV_VAR: "FART FACE!"
+  #env_server:
+  #  transport: stdio
+  #  command: bash
+  #  args: ["-c", "python3 /Users/odewahn/Desktop/mcp-work/learn-concurrency/mcp-repl-with-pydantic/servers/mcp_env_server.py 2>/dev/null"]
+  #  env:
+  #    MY_ENV_VAR: "FART FACE!"
 
   shell_tool:
     transport: stdio

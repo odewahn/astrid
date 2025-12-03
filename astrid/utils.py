@@ -78,8 +78,10 @@ async def discover_all_tools(config):
             async with Client(single_cfg) as c:
                 server_tools = await c.list_tools()
                 # Optionally prefix names with the server name to avoid collisions
-                for t in server_tools:
-                    t.name = f"{name}_{t.name}"
+                # This is only needed if there are multiple servers
+                if len(config["mcpServers"]) > 1:
+                    for t in server_tools:
+                        t.name = f"{name}_{t.name}"
                 all_tools.extend(server_tools)
         except Exception as e:
             raise Exception(f"[red]Failed to list tools from server {name}: {e}[/red]")

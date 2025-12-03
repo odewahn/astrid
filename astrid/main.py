@@ -2,6 +2,7 @@ import asyncio
 import argparse
 import sys
 import os
+import json
 
 from rich.console import Console
 
@@ -310,6 +311,21 @@ async def run_repl(
             summary = conversation.exchange_summary()
             continue
 
+        if text == "/tools":
+
+            mcp_tools = await client.list_tools()
+            tools_json = json.dumps(
+                [tool.model_dump() for tool in mcp_tools],  # turn each Tool into a dict
+                indent=2,
+            )
+            ui.print(f"Results from client.list_tools: {tools_json}")
+            mcp_tools_all = await discover_all_tools(config)
+            mcp_tools_all = convert_mcp_tools_to_openai_format(mcp_tools_all)
+            ui.print(
+                f"All discovered tools in OpenAI format: {json.dumps(mcp_tools_all, indent=2)}"
+            )
+            continue
+
         # Normal user input -> build a Turn and call complete_turn directly
         initial_turn = create_initial_turn(config, text, conversation=conversation)
 
@@ -414,15 +430,14 @@ def main():
 
     # Patch in any inherited shell variables from the environment
 
-    inherited = config.get("inherited_shell_variables", []) or []
+    # inherited = config.get("inherited_shell_variables", []) or []
     for server_name, server_cfg in config.get("mcpServers", {}).items():
         # Preserve any existing env config
-        env = server_cfg.setdefault("env", {})
-
-        # Merge in inherited vars *without* overwriting existing keys
-        for var in inherited:
-            if var in os.environ and var not in env:
-                env[var] = os.environ[var]
+        env = dict(os.environ)
+        user_env = server_cfg.setdefault("env", {})
+        for key, val in user_env.items():
+            env[key] = val
+        config["mcpServers"][server_name]["env"] = env
 
     # Begin the loop
     if settings.console_url:
