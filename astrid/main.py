@@ -410,8 +410,6 @@ def main():
             decrypted = load_and_decrypt_env(encrypted_api_key_name)
         except Exception as e:
             raise SystemExit(1)
-        console.print(f"[bold yellow]Setting {decrypted_api_key_name}")
-        console.print(f"[bold yellow]decrypted value {decrypted}[/]")
         os.environ[decrypted_api_key_name] = decrypted
 
     # Patch in any inherited shell variables from the environment

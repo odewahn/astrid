@@ -31,7 +31,7 @@ mcpServers:
   shell_tool:
     transport: stdio
     command: bash 
-    args: ["-c", "uvx mcp-shell-server 2>/dev/null"]
+    args: ["-c", "uvx mcp-shell-server"]
     env:
       ALLOW_COMMANDS: gcloud, gsutil, bq, python, uv, git, curl, jq, zip, unzip, tar, make, terraform
 
