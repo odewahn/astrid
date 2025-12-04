@@ -17,6 +17,7 @@ class Settings:
 
     # Log file goes to current working direcotory + filename
     CONVERSATION_LOG_FILE: str = os.path.join(os.getcwd(), "conversation_log.json")
+    SYSTEM_LOG_FILE = "astrid.log"
 
     console_url = os.environ.get("console_url", None)
     console_username = os.environ.get("email", None)

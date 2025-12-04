@@ -6,7 +6,14 @@ import json
 
 from rich.console import Console
 
+# Must be first — before importing fastmcp, litellm, or your MCP client code
+
+from astrid.logging_setup import configure_logging
+
+configure_logging()
+
 console = Console()
+
 from astrid.settings import settings
 
 version_string = f"{settings.ASSISTANT_NAME} version {settings.VERSION}"
@@ -39,13 +46,46 @@ with console.status(f"Loading {version_string}..."):
     from litellm import acompletion, stream_chunk_builder
     from fastmcp import Client
     from fastmcp.exceptions import ToolError  # if not already imported
+    from fastmcp.client.logging import LogMessage
     import traceback
+
+    import logging
 
 
 # Turn off Pydantic deprecation warnings that happen with fastmcp
 import warnings
 
 warnings.filterwarnings("ignore", category=DeprecationWarning)
+
+
+# **********************************************************************
+# Set up logging for fastmcp
+# See https://gofastmcp.com/clients/logging
+# **********************************************************************
+# In a real app, you might configure this in your main entry point
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
+# Get a logger for the module where the client is used
+logger = logging.getLogger(__name__)
+
+# This mapping is useful for converting MCP level strings to Python's levels
+LOGGING_LEVEL_MAP = logging.getLevelNamesMapping()
+
+
+async def log_handler(message: LogMessage):
+    """
+    Handles incoming logs from the MCP server and forwards them
+    to the standard Python logging system.
+    """
+    msg = message.data.get("msg")
+    extra = message.data.get("extra")
+
+    # Convert the MCP log level to a Python log level
+    level = LOGGING_LEVEL_MAP.get(message.level.upper(), logging.INFO)
+
+    # Log the message using the standard logging library
+    logger.log(level, msg, extra=extra)
 
 
 # **********************************************************************
@@ -453,7 +493,7 @@ def main():
     ui = REPLTurnUI(set_status_callback=set_status)
 
     async def runner():
-        client = Client(config)
+        client = Client(config, log_handler=log_handler)
 
         ui.set_status("Connecting to MCP server...")
         async with client:
