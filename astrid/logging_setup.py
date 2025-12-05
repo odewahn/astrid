@@ -2,6 +2,7 @@
 import logging
 import os
 from logging import StreamHandler
+import sys
 
 DEFAULT_LOG_FILE = "astrid.log"
 
@@ -26,6 +27,9 @@ def configure_logging(
     """
     # Ensure LiteLLM (if/when imported) doesn't default to debug
     os.environ.setdefault("LITELLM_LOG", "ERROR")
+
+    stderr_file = open(log_file, "a", buffering=1)  # line-buffered append mode
+    sys.stderr = stderr_file
 
     root = logging.getLogger()
 

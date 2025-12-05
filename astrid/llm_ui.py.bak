@@ -56,6 +56,9 @@ class REPLTurnUI:
         set_status_callback: Optional[Callable[[str], None]] = None,
     ) -> None:
         self._set_status_callback = set_status_callback
+        self._characters_printed = (
+            0  # Track chars printed on current line for streaming
+        )
 
     # --- TurnUI interface used by LLMEngine / complete_turn -------------
 
@@ -70,7 +73,7 @@ class REPLTurnUI:
         """
         Called by the engine once the work is complete.
         """
-        pass
+        self.print("")
 
     def print_streaming_token(self, text: str) -> None:
         """

@@ -55,7 +55,95 @@ class REPLTurnUI:
         self,
         set_status_callback: Optional[Callable[[str], None]] = None,
     ) -> None:
-        self._set_status_callback = set_status_callback
+        self._set_status_callback = set_status_callback or (lambda _text: None)
+
+        self._spinner_task: Optional[asyncio.Task] = None
+        self._stop_event: Optional[asyncio.Event] = None
+        self._spinner_label: str = ""
+        self._last_render_len: int = 0
+        self._characters_printed: int = 0
+
+    # --- Internal spinner logic ----------------------------------------
+
+    async def _spinner_worker(self) -> None:
+        """
+        Animate an indeterminate progress indicator on stderr.
+
+        This runs until _stop_event is set.
+        """
+        frames = ["⣾", "⣷", "⣯", "⣟", "⡿", "⢿", "⣻", "⣽"]
+        i = 0
+
+        while self._stop_event and not self._stop_event.is_set():
+            frame = frames[i % len(frames)]
+            i += 1
+
+            label = self._spinner_label or "Working"
+            line = f"[{frame}] {label}"
+
+            # Render on a single line, overwriting previous contents.
+            render = "\r" + line
+            pad = max(0, self._last_render_len - len(line))
+            if pad:
+                render += " " * pad
+
+            sys.stderr.write(render)
+            sys.stderr.flush()
+
+            self._last_render_len = len(line)
+
+            try:
+                await asyncio.sleep(0.1)
+            except asyncio.CancelledError:
+                break
+
+        # Clear the line when done.
+        if self._last_render_len > 0:
+            sys.stderr.write("\r" + " " * self._last_render_len + "\r")
+            sys.stderr.flush()
+            self._last_render_len = 0
+
+    def _start_spinner(self, label: str) -> None:
+        """
+        Start (or update) the spinner for the given label.
+        """
+        self._spinner_label = label or "Working"
+
+        # Notify any bottom-toolbar status
+        self._set_status_callback(self._spinner_label)
+
+        # If a spinner is already running, just update the label; worker
+        # reads _spinner_label on each loop.
+        if self._spinner_task and not self._spinner_task.done():
+            return
+
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            # No running loop: we're not in async context. In practice this
+            # shouldn't happen because the engine runs under asyncio.
+            return
+
+        self._stop_event = asyncio.Event()
+        self._spinner_task = loop.create_task(self._spinner_worker())
+
+    def _stop_spinner(self) -> None:
+        """
+        Stop the spinner and clear the status.
+        """
+        # Reset logical status for bottom toolbar
+        self._set_status_callback("")
+
+        if self._stop_event is not None:
+            self._stop_event.set()
+        # Let the worker clear its line and exit; no need to cancel explicitly.
+        if self._last_render_len > 0:
+            # clear the line
+            sys.stderr.write("\r" + " " * self._last_render_len)
+            # move to beginning of *next* line
+            sys.stderr.write("\r")
+            sys.stderr.flush()
+            self._last_render_len = 0
 
     # --- TurnUI interface used by LLMEngine / complete_turn -------------
 
@@ -64,13 +152,14 @@ class REPLTurnUI:
         Called by the engine to indicate some long-running work is happening,
         e.g. "Generating response..." or "Running tools...".
         """
-        self.print(f"[dark_red]{text[:100]}")  # Print a brief message to Rich console
+        label = text or "Working"
+        self._start_spinner(label)
 
     def hide_status(self) -> None:
         """
         Called by the engine once the work is complete.
         """
-        pass
+        self._stop_spinner()
 
     def print_streaming_token(self, text: str) -> None:
         """
