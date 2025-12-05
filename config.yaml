@@ -31,7 +31,7 @@ mcpServers:
   shell_tool:
     transport: stdio
     command: uvx 
-    args: ["--directory", ".", "mcp-shell-server"]
+    args: ["--directory", "$USER_HOME", "mcp-shell-server"]
     env:
       ALLOW_COMMANDS: gcloud, gsutil, bq, python, uv, git, curl, jq, zip, unzip, tar, make, terraform
       FASTMCP_LOG_LEVEL: "ERROR"

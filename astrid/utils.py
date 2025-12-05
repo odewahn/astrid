@@ -28,7 +28,9 @@ def load_config(config_fn: str) -> dict:
     try:
         with open(config_fn, "r") as f:
             config_data = f.read()
-            config = yaml.safe_load(config_data)
+            # Interpolate environment variables
+            interpolated_string = os.path.expandvars(config_data)
+            config = yaml.safe_load(interpolated_string)
             # Normalize possible mcp keys to "mcpServers"
             for key in ["mcpServers", "mcp_servers", "mcpservers"]:
                 if key in config:

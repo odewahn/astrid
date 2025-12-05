@@ -399,9 +399,6 @@ def main():
         # delete existing log file if it exists
         if os.path.exists(settings.CONVERSATION_LOG_FILE):
             os.remove(settings.CONVERSATION_LOG_FILE)
-        console.print(
-            f"[green]Conversation logging enabled to {settings.CONVERSATION_LOG_FILE}"
-        )
 
     # ensure they've entered a config or a repo, but not both!
     if not args.config and not args.repo:
