@@ -304,10 +304,7 @@ async def run_repl(
     console = Console()
 
     def bottom_toolbar() -> str:
-        base = f"{config['title']} | /help /config /creds /exit"
-        if status.get("text"):
-            return f"{base} | {status['text']}"
-        return base
+        return f"{config['title']} | /help /config /creds /exit"
 
     prompt_message = HTML(f"<ansigreen>{settings.ASSISTANT_NAME}&gt; </ansigreen>")
     session = PromptSession(
@@ -490,7 +487,7 @@ def main():
         status["text"] = text or ""
 
     # UI is composed here and passed into run_repl
-    ui = REPLTurnUI(set_status_callback=set_status)
+    ui = REPLTurnUI()
 
     async def runner():
         client = Client(config, log_handler=log_handler)

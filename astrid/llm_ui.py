@@ -55,9 +55,7 @@ class REPLTurnUI:
 
     def __init__(
         self,
-        set_status_callback: Optional[Callable[[str], None]] = None,
     ) -> None:
-        self._set_status_callback = set_status_callback
         self._rich_status = None
         self._characters_printed = (
             0  # Track chars printed on current line for streaming
@@ -66,10 +64,6 @@ class REPLTurnUI:
     # --- TurnUI interface used by LLMEngine / complete_turn -------------
 
     def set_status(self, text: str) -> None:
-        # Update optional prompt-toolkit toolbar
-        if self._set_status_callback:
-            self._set_status_callback(text)
-
         # Create or update a Rich status spinner
         if self._rich_status is None:
             self._rich_status = console.status(text, spinner="dots")
@@ -78,14 +72,12 @@ class REPLTurnUI:
             self._rich_status.update(text)
 
     def hide_status(self) -> None:
-        # Clear bottom toolbar if used
-        if self._set_status_callback:
-            self._set_status_callback("")
-
         # Stop and remove the spinner
         if self._rich_status is not None:
             self._rich_status.__exit__(None, None, None)
             self._rich_status = None
+        # Resert character count for streaming
+        self._characters_printed = 0
 
     def print_streaming_token(self, text: str) -> None:
         """
