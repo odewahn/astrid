@@ -24,6 +24,8 @@ from prompt_toolkit import PromptSession
 from prompt_toolkit.formatted_text import HTML
 from prompt_toolkit.patch_stdout import patch_stdout
 
+
+from rich.status import Status
 from rich.console import Console
 from rich.panel import Panel
 from rich.text import Text
@@ -56,21 +58,34 @@ class REPLTurnUI:
         set_status_callback: Optional[Callable[[str], None]] = None,
     ) -> None:
         self._set_status_callback = set_status_callback
+        self._rich_status = None
+        self._characters_printed = (
+            0  # Track chars printed on current line for streaming
+        )
 
     # --- TurnUI interface used by LLMEngine / complete_turn -------------
 
     def set_status(self, text: str) -> None:
-        """
-        Called by the engine to indicate some long-running work is happening,
-        e.g. "Generating response..." or "Running tools...".
-        """
-        self.print(f"[dark_red]{text[:100]}")  # Print a brief message to Rich console
+        # Update optional prompt-toolkit toolbar
+        if self._set_status_callback:
+            self._set_status_callback(text)
+
+        # Create or update a Rich status spinner
+        if self._rich_status is None:
+            self._rich_status = console.status(text, spinner="dots")
+            self._rich_status.__enter__()  # show spinner
+        else:
+            self._rich_status.update(text)
 
     def hide_status(self) -> None:
-        """
-        Called by the engine once the work is complete.
-        """
-        pass
+        # Clear bottom toolbar if used
+        if self._set_status_callback:
+            self._set_status_callback("")
+
+        # Stop and remove the spinner
+        if self._rich_status is not None:
+            self._rich_status.__exit__(None, None, None)
+            self._rich_status = None
 
     def print_streaming_token(self, text: str) -> None:
         """
